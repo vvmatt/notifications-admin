@@ -76,10 +76,21 @@ class Preview(Config):
     CSV_UPLOAD_BUCKET_NAME = 'preview-notifications-csv-upload'
 
 
+class Staging(Config):
+    SHOW_STYLEGUIDE = False
+    HTTP_PROTOCOL = 'https'
+
+
+class Live(Config):
+    SHOW_STYLEGUIDE = False
+    HEADER_COLOUR = '#B10E1E'  # $red
+    HTTP_PROTOCOL = 'https'
+
+
 configs = {
     'development': 'config.Development',
     'test': 'config.Test',
     'preview': 'config.Preview',
-    'staging': 'config_staging.Staging',
-    'live': 'config_live.Live'
+    'staging': 'config.Staging',
+    'live': 'config.Live'
 }
