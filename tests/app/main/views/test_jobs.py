@@ -5,11 +5,11 @@ from urllib.parse import urlparse, quote, parse_qs
 import pytest
 from flask import url_for
 from bs4 import BeautifulSoup
+from freezegun import freeze_time
 
 from app.utils import generate_notifications_csv
 from app.main.views.jobs import get_time_left, get_status_filters
 from tests import notification_json
-from freezegun import freeze_time
 
 
 def test_get_jobs_should_return_list_of_all_real_jobs(
@@ -302,6 +302,7 @@ def test_should_show_updates_for_one_job_as_json(
         (None, 1)
     ]
 )
+@freeze_time('2016-01-01T12:00:00')
 def test_can_show_notifications(
     app_,
     service_one,
