@@ -13,8 +13,8 @@ from datetime import datetime
 template_types = ['email', 'sms']
 
 # The * ignores hidden files, eg .DS_Store
-test_spreadsheet_files = glob(path.join('tests', 'spreadsheet_files', '*'))
-test_non_spreadsheet_files = glob(path.join('tests', 'non_spreadsheet_files', '*'))
+test_spreadsheet_files = glob(path.join('tests', 'upload_test_files', 'spreadsheet_files', '*'))
+test_non_spreadsheet_files = glob(path.join('tests', 'upload_test_files', 'non_spreadsheet_files', '*'))
 
 
 def test_that_test_files_exist():
