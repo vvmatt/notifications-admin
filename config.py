@@ -15,7 +15,7 @@ class Config(object):
     DESKPRO_DEPT_ID = 5
     DESKPRO_ASSIGNED_AGENT_TEAM_ID = 5
 
-    DEBUG = False
+    DEBUG = True
     ADMIN_CLIENT_USER_NAME = 'notify-admin'
     ASSETS_DEBUG = False
     AWS_REGION = 'eu-west-1'
