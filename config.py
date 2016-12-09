@@ -1,21 +1,47 @@
 import os
 from datetime import timedelta
+import json
 
 
 class Config(object):
-    ADMIN_CLIENT_SECRET = os.environ['ADMIN_CLIENT_SECRET']
-    API_HOST_NAME = os.environ['API_HOST_NAME']
-    SECRET_KEY = os.environ['SECRET_KEY']
-    DANGEROUS_SALT = os.environ['DANGEROUS_SALT']
-    DESKPRO_API_HOST = os.environ['DESKPRO_API_HOST']
-    DESKPRO_API_KEY = os.environ['DESKPRO_API_KEY']
-    # Hosted graphite statsd prefix
-    STATSD_PREFIX = os.getenv('STATSD_PREFIX')
+    if os.getenv('VCAP_SERVICES') is not None:
+        vcap_services = json.loads(os.environ.get('VCAP_SERVICES'))
+
+        # Notify common config
+        notify_config = next((s for s in vcap_services['user-provided'] if s["name"] == "notify-config"))
+        ADMIN_CLIENT_SECRET = notify_config['credentials']['admin_client_secret']
+        API_HOST_NAME = notify_config['credentials']['api_host_name']
+        SECRET_KEY = notify_config['credentials']['secret_key']
+        DANGEROUS_SALT = notify_config['credentials']['dangerous_salt']
+
+        # DeskPro config
+        deskpro_config = next((s for s in vcap_services['user-provided'] if s["name"] == "deskpro"))
+        DESKPRO_API_HOST = deskpro_config['credentials']['api_host']
+        DESKPRO_API_KEY = deskpro_config['credentials']['api_key']
+
+        # AWS config
+        aws_config = next((s for s in vcap_services['user-provided'] if s["name"] == "notify-aws"))
+        os.environ["AWS_ACCESS_KEY_ID"] = aws_config['credentials']['aws_access_key_id']
+        os.environ["AWS_SECRET_ACCESS_KEY"] = aws_config['credentials']['aws_secret_access_key']
+
+        # Hosted Graphite config
+        hosted_graphite_config = next((s for s in vcap_services['user-provided'] if s["name"] == "hosted-graphite"))
+        STATSD_PREFIX = hosted_graphite_config['credentials']['statsd_prefix']
+    else:
+        ADMIN_CLIENT_SECRET = os.environ['ADMIN_CLIENT_SECRET']
+        API_HOST_NAME = os.environ['API_HOST_NAME']
+        SECRET_KEY = os.environ['SECRET_KEY']
+        DANGEROUS_SALT = os.environ['DANGEROUS_SALT']
+        DESKPRO_API_HOST = os.environ['DESKPRO_API_HOST']
+        DESKPRO_API_KEY = os.environ['DESKPRO_API_KEY']
+
+        # Hosted graphite statsd prefix
+        STATSD_PREFIX = os.getenv('STATSD_PREFIX')
 
     DESKPRO_DEPT_ID = 5
     DESKPRO_ASSIGNED_AGENT_TEAM_ID = 5
 
-    DEBUG = True
+    DEBUG = False
     ADMIN_CLIENT_USER_NAME = 'notify-admin'
     ASSETS_DEBUG = False
     AWS_REGION = 'eu-west-1'
@@ -110,10 +136,21 @@ class Live(Config):
     NOTIFY_ENVIRONMENT = 'live'
 
 
+# CloudFoundry sandbox
+class Sandbox(Config):
+    DEBUG = True
+    HTTP_PROTOCOL = 'https'
+    HEADER_COLOUR = '#F499BE'  # $baby-pink
+    STATSD_ENABLED = True
+    CSV_UPLOAD_BUCKET_NAME = 'cf-sandbox-notifications-csv-upload'
+    NOTIFY_ENVIRONMENT = 'sandbox'
+
+
 configs = {
     'development': Development,
     'test': Test,
     'preview': Preview,
     'staging': Staging,
-    'live': Live
+    'live': Live,
+    'sandbox': Sandbox
 }
