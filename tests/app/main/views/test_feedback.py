@@ -1,4 +1,4 @@
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, element
 from functools import partial
 import pytest
 from flask import url_for
@@ -30,7 +30,24 @@ def test_get_support_index_page(client):
     ('problem', 'Report a problem'),
     ('question', 'Ask a question or give feedback'),
 ])
-def test_choose_support_type(client, support_type, expected_h1):
+@pytest.mark.parametrize('logged_in, expected_form_field, expected_contact_details', [
+    (True, type(None), 'We’ll reply to test@user.gov.uk'),
+    (True, type(None), 'We’ll reply to test@user.gov.uk'),
+    (False, element.Tag, 'Leave your details below if you\'d like a response.'),
+])
+def test_choose_support_type(
+    client,
+    api_user_active,
+    mock_get_user,
+    mock_get_services,
+    logged_in,
+    expected_form_field,
+    expected_contact_details,
+    support_type,
+    expected_h1
+):
+    if logged_in:
+        client.login(api_user_active)
     response = client.post(
         url_for('main.support'),
         data={'support_type': support_type}, follow_redirects=True
@@ -38,6 +55,9 @@ def test_choose_support_type(client, support_type, expected_h1):
     assert response.status_code == 200
     page = BeautifulSoup(response.data.decode('utf-8'), 'html.parser')
     assert page.h1.string.strip() == expected_h1
+    assert isinstance(page.find('input', {'name': 'name'}), expected_form_field)
+    assert isinstance(page.find('input', {'name': 'email_address'}), expected_form_field)
+    assert page.find('form').find('p').text.strip() == expected_contact_details
 
 
 @pytest.mark.parametrize('ticket_type, expected_status_code', [
