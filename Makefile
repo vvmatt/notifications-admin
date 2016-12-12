@@ -20,6 +20,9 @@ DOCKER_CONTAINER_PREFIX = ${USER}-${BUILD_TAG}
 CODEDEPLOY_PREFIX ?= notifications-admin
 CODEDEPLOY_APP_NAME ?= notify-admin
 
+CF_API ?= api.cloud.service.gov.uk
+CF_ORG ?= govuk-notify
+
 .PHONY: help
 help:
 	@cat $(MAKEFILE_LIST) | grep -E '^[a-zA-Z_-]+:.*?## .*$$' | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
@@ -97,7 +100,7 @@ coverage: venv ## Create coverage report
 .PHONY: prepare-docker-build-image
 prepare-docker-build-image: ## Prepare the Docker builder image
 	mkdir -p ${PIP_ACCEL_CACHE}
-	make -C docker build-build-image
+	make -C docker build
 
 .PHONY: build-with-docker
 build-with-docker: prepare-docker-build-image ## Build inside a Docker container
@@ -157,8 +160,40 @@ coverage-with-docker: prepare-docker-build-image ## Generates coverage report in
 clean-docker-containers: ## Clean up any remaining docker containers
 	docker rm -f $(shell docker ps -q -f "name=${DOCKER_CONTAINER_PREFIX}") 2> /dev/null || true
 
+.PHONY: clean
 clean:
 	rm -rf node_modules cache target venv .coverage
 
-cf-push:
-	cf push
+.PHONY: cf-login
+cf-login: ## Log in to Cloud Foundry
+	$(if ${CF_USERNAME},,$(error Must specify CF_USERNAME))
+	$(if ${CF_PASSWORD},,$(error Must specify CF_PASSWORD))
+	$(if ${CF_SPACE},,$(error Must specify CF_SPACE))
+	@echo "Logging in to Cloud Foundry on ${CF_API}"
+	@cf login -a "${CF_API}" -u ${CF_USERNAME} -p "${CF_PASSWORD}"
+	cf target -o "${CF_ORG}" -s "${CF_SPACE}"
+
+.PHONY: cf-deploy
+cf-deploy: cf-login ## Deploys the app to Cloud Foundry
+	$(eval export ORIG_INSTANCES=$(shell cf curl /v2/apps/$(shell cf app --guid notify-admin) | jq -r ".entity.instances"))
+	@echo "Original instance count: ${ORIG_INSTANCES}"
+	cf zero-downtime-push notify-admin && \
+	cf scale -i ${ORIG_INSTANCES} notify-admin
+
+.PHONY: cf-deploy-with-docker
+cf-deploy-with-docker: prepare-docker-build-image ## Deploys the app to Cloud Foundry from a new Docker container
+	@docker run -i --rm \
+		--name "${DOCKER_CONTAINER_PREFIX}-cf-deploy" \
+		-v `pwd`:/var/project \
+		-e http_proxy="${HTTP_PROXY}" \
+		-e HTTP_PROXY="${HTTP_PROXY}" \
+		-e https_proxy="${HTTPS_PROXY}" \
+		-e HTTPS_PROXY="${HTTPS_PROXY}" \
+		-e NO_PROXY="${NO_PROXY}" \
+		-e CF_API="${CF_API}" \
+		-e CF_USERNAME="${CF_USERNAME}" \
+		-e CF_PASSWORD="${CF_PASSWORD}" \
+		-e CF_ORG="${CF_ORG}" \
+		-e CF_SPACE="${CF_SPACE}" \
+		${DOCKER_BUILDER_IMAGE_NAME} \
+		make cf-deploy
