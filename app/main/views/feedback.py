@@ -1,7 +1,7 @@
 import requests
 from flask import render_template, url_for, redirect, flash, current_app, abort
 from app.main import main
-from app.main.forms import SupportType, Feedback
+from app.main.forms import SupportType, Support
 
 
 @main.route('/support', methods=['GET', 'POST'])
@@ -19,7 +19,7 @@ def support():
 def feedback(ticket_type):
     if ticket_type not in ['problem', 'question']:
         abort(404)
-    form = Feedback()
+    form = Support()
     if form.validate_on_submit():
         user_supplied_email = form.email_address.data != ''
         feedback_msg = 'Environment: {}\n{}\n{}'.format(

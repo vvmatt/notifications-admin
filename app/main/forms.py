@@ -392,7 +392,7 @@ class SupportType(Form):
     )
 
 
-class Feedback(Form):
+class Support(Form):
     name = StringField('Name')
     email_address = StringField('Email address')
     feedback = TextAreaField('Your message', validators=[DataRequired(message="Can’t be empty")])
