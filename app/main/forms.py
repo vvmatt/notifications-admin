@@ -398,6 +398,17 @@ class Support(Form):
     feedback = TextAreaField('Your message', validators=[DataRequired(message="Can’t be empty")])
 
 
+class Triage(Form):
+    severe = RadioField(
+        'Are you have trouble sending messages?',
+        choices=[
+            ('yes', 'Yes'),
+            ('no', 'No'),
+        ],
+        validators=[DataRequired()]
+    )
+
+
 class RequestToGoLiveForm(Form):
     mou = RadioField(
         (
