@@ -1,3 +1,5 @@
+from bs4 import BeautifulSoup
+from functools import partial
 import pytest
 from flask import url_for
 from werkzeug.exceptions import InternalServerError
@@ -24,61 +26,125 @@ def test_get_support_index_page(client):
     assert resp.status_code == 200
 
 
-def test_get_feedback_page(app_):
+@pytest.mark.parametrize('support_type, expected_h1', [
+    ('problem', 'Report a problem'),
+    ('question', 'Ask a question or give feedback'),
+])
+def test_choose_support_type(client, support_type, expected_h1):
+    response = client.post(
+        url_for('main.support'),
+        data={'support_type': support_type}, follow_redirects=True
+    )
+    assert response.status_code == 200
+    page = BeautifulSoup(response.data.decode('utf-8'), 'html.parser')
+    assert page.h1.string.strip() == expected_h1
+
+
+@pytest.mark.parametrize('ticket_type, expected_status_code', [
+    ('problem', 200),
+    ('question', 200),
+    ('gripe', 404)
+])
+def test_get_feedback_page(app_, ticket_type, expected_status_code):
     with app_.test_request_context():
         with app_.test_client() as client:
-            resp = client.get(url_for('main.feedback'))
-            assert resp.status_code == 200
+            resp = client.get(url_for('main.feedback', ticket_type=ticket_type))
+            assert resp.status_code == expected_status_code
 
 
-def test_post_feedback_with_name_but_no_email(app_, mocker):
+@pytest.mark.parametrize('data, expected_message, expected_person_name, expected_email', [
+    (
+        {'feedback': "blah", 'name': 'Fred'},
+        'Environment: http://localhost/\nFred (no email address supplied)\nblah',
+        'Fred',
+        'donotreply@notifications.service.gov.uk',
+    ),
+    (
+        {'feedback': "blah"},
+        'Environment: http://localhost/\n (no email address supplied)\nblah',
+        None,
+        'donotreply@notifications.service.gov.uk',
+    ),
+    (
+        {'feedback': "blah", 'name': "Steve Irwin", 'email_address': 'rip@gmail.com'},
+        'Environment: http://localhost/\n\nblah',
+        'Steve Irwin',
+        'rip@gmail.com',
+    ),
+])
+@pytest.mark.parametrize('ticket_type', ['problem', 'question'])
+def test_post_feedback_with_name_but_no_email(
+    client,
+    mocker,
+    ticket_type,
+    data,
+    expected_message,
+    expected_person_name,
+    expected_email,
+):
     mock_post = mocker.patch(
         'app.main.views.feedback.requests.post',
-        return_value=Mock(status_code=201))
-    with app_.test_request_context():
-        with app_.test_client() as client:
-            resp = client.post(url_for('main.feedback'), data={'feedback': "blah", 'name': 'Fred'})
-            assert resp.status_code == 302
-            mock_post.assert_called_with(
-                ANY,
-                data={
-                    'department_id': ANY,
-                    'agent_team_id': ANY,
-                    'subject': 'Notify feedback',
-                    'message': 'Environment: http://localhost/\nFred (no email address supplied)\nblah',
-                    'person_email': app_.config['DESKPRO_PERSON_EMAIL'],
-                    'person_name': 'Fred'},
-                headers=ANY)
+        return_value=Mock(status_code=201)
+    )
+    resp = client.post(
+        url_for('main.feedback', ticket_type=ticket_type),
+        data=data,
+    )
+    assert resp.status_code == 302
+    mock_post.assert_called_with(
+        ANY,
+        data={
+            'department_id': ANY,
+            'agent_team_id': ANY,
+            'subject': 'Notify feedback',
+            'message': expected_message.format(ticket_type),
+            'person_email': expected_email,
+            'person_name': expected_person_name,
+            'label': ticket_type,
+        },
+        headers=ANY
+    )
 
 
-def test_post_feedback_with_no_name_or_email(app_, mocker):
-    mock_post = mocker.patch(
-        'app.main.views.feedback.requests.post',
-        return_value=Mock(status_code=201))
-    with app_.test_request_context():
-        with app_.test_client() as client:
-            resp = client.post(url_for('main.feedback'), data={'feedback': "blah"})
-            assert resp.status_code == 302
-            mock_post.assert_called_with(
-                ANY,
-                data={
-                    'department_id': ANY,
-                    'agent_team_id': ANY,
-                    'subject': 'Notify feedback',
-                    'message': 'Environment: http://localhost/\n (no email address supplied)\nblah',
-                    'person_email': app_.config['DESKPRO_PERSON_EMAIL'],
-                    'person_name': None},
-                headers=ANY)
-
-
-def test_post_feedback_with_name_email(app_, mocker):
+@pytest.mark.parametrize('ticket_type', ['problem', 'question'])
+def test_post_feedback_with_no_name_or_email(app_, mocker, ticket_type):
     mock_post = mocker.patch(
         'app.main.views.feedback.requests.post',
         return_value=Mock(status_code=201))
     with app_.test_request_context():
         with app_.test_client() as client:
             resp = client.post(
-                url_for('main.feedback'),
+                url_for('main.feedback', ticket_type=ticket_type),
+                data={'feedback': "blah"},
+            )
+            assert resp.status_code == 302
+            mock_post.assert_called_with(
+                ANY,
+                data={
+                    'department_id': ANY,
+                    'agent_team_id': ANY,
+                    'subject': 'Notify feedback',
+                    'message': (
+                        'Environment: http://localhost/\n'
+                        ' (no email address supplied)\nblah'
+                    ),
+                    'person_email': app_.config['DESKPRO_PERSON_EMAIL'],
+                    'person_name': None,
+                    'label': ticket_type,
+                },
+                headers=ANY
+            )
+
+
+@pytest.mark.parametrize('ticket_type', ['problem', 'question'])
+def test_log_error_on_post(app_, mocker, ticket_type):
+    mock_post = mocker.patch(
+        'app.main.views.feedback.requests.post',
+        return_value=Mock(status_code=201))
+    with app_.test_request_context():
+        with app_.test_client() as client:
+            resp = client.post(
+                url_for('main.feedback', ticket_type=ticket_type),
                 data={'feedback': "blah", 'name': "Steve Irwin", 'email_address': 'rip@gmail.com'})
             assert resp.status_code == 302
             mock_post.assert_called_with(
@@ -93,7 +159,8 @@ def test_post_feedback_with_name_email(app_, mocker):
                 headers=ANY)
 
 
-def test_log_error_on_post(app_, mocker):
+@pytest.mark.parametrize('ticket_type', ['problem', 'question'])
+def test_log_error_on_post(app_, mocker, ticket_type):
     mock_post = mocker.patch(
         'app.main.views.feedback.requests.post',
         return_value=Mock(
@@ -106,7 +173,7 @@ def test_log_error_on_post(app_, mocker):
         with app_.test_client() as client:
             with pytest.raises(InternalServerError):
                 resp = client.post(
-                    url_for('main.feedback'),
+                    url_for('main.feedback', ticket_type=ticket_type),
                     data={'feedback': "blah", 'name': "Steve Irwin", 'email_address': 'rip@gmail.com'})
             assert mock_post.called
             mock_logger.assert_called_with(
