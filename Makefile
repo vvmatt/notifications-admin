@@ -177,7 +177,8 @@ cf-login: ## Log in to Cloud Foundry
 cf-deploy: cf-login ## Deploys the app to Cloud Foundry
 	$(eval export ORIG_INSTANCES=$(shell cf curl /v2/apps/$(shell cf app --guid notify-admin) | jq -r ".entity.instances"))
 	@echo "Original instance count: ${ORIG_INSTANCES}"
-	cf zero-downtime-push notify-admin && \
+	cf check-manifest notify-admin -f manifest.yml
+	cf zero-downtime-push notify-admin
 	cf scale -i ${ORIG_INSTANCES} notify-admin
 
 .PHONY: cf-deploy-with-docker
