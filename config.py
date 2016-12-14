@@ -27,6 +27,8 @@ class Config(object):
         # Hosted Graphite config
         hosted_graphite_config = next((s for s in vcap_services['user-provided'] if s["name"] == "hosted-graphite"))
         STATSD_PREFIX = hosted_graphite_config['credentials']['statsd_prefix']
+
+        DEBUG = True
     else:
         ADMIN_CLIENT_SECRET = os.environ['ADMIN_CLIENT_SECRET']
         API_HOST_NAME = os.environ['API_HOST_NAME']
@@ -38,10 +40,11 @@ class Config(object):
         # Hosted graphite statsd prefix
         STATSD_PREFIX = os.getenv('STATSD_PREFIX')
 
+        DEBUG = False
+
     DESKPRO_DEPT_ID = 5
     DESKPRO_ASSIGNED_AGENT_TEAM_ID = 5
 
-    DEBUG = False
     ADMIN_CLIENT_USER_NAME = 'notify-admin'
     ASSETS_DEBUG = False
     AWS_REGION = 'eu-west-1'
@@ -138,7 +141,6 @@ class Live(Config):
 
 # CloudFoundry sandbox
 class Sandbox(Config):
-    DEBUG = True
     HTTP_PROTOCOL = 'https'
     HEADER_COLOUR = '#F499BE'  # $baby-pink
     STATSD_ENABLED = True

@@ -1,0 +1,8 @@
+---
+inherit: manifest-base.yml
+
+applications:
+  - name: notify-admin
+    host: notify-admin-production
+    instances: 2
+    memory: 2048M
