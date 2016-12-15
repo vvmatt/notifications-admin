@@ -3,6 +3,8 @@ inherit: manifest-base.yml
 
 applications:
   - name: notify-admin
-    host: notify-admin-production
+    routes:
+      - route: notify-admin-production.cloudapps.digital
+      - route: admin-paas.notifications.service.gov.uk
     instances: 2
     memory: 2048M
